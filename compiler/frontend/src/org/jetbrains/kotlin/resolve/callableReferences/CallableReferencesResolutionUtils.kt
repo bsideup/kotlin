@@ -155,7 +155,7 @@ private fun bindFunctionReference(expression: KtCallableReferenceExpression, typ
             context.scope.ownerDescriptor,
             Annotations.EMPTY,
             CallableMemberDescriptor.Kind.DECLARATION,
-            expression.toSourceElement()
+            expression.toSourceElement(), /* isCoroutine = */ false
     )
 
     functionDescriptor.initialize(

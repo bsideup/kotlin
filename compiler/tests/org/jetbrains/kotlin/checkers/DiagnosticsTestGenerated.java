@@ -3669,6 +3669,12 @@ public class DiagnosticsTestGenerated extends AbstractDiagnosticsTest {
                 doTest(fileName);
             }
 
+            @TestMetadata("suspendFunctions.kt")
+            public void testSuspendFunctions() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/coroutines/suspendFunctions.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("wrongHandleResult.kt")
             public void testWrongHandleResult() throws Exception {
                 String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/coroutines/wrongHandleResult.kt");
