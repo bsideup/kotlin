@@ -1,0 +1,24 @@
+<html>
+<body>
+This inspection reports dangerous operations inside constructors including:
+<ul>
+  <li>Accessing non-final property in constructor</li>
+  <li>Calling non-final function in constructor</li>
+  <li>Using 'this' as function argument in constructor of non-final class</li>
+</ul>
+These operations are dangerous because your class can be inherited,
+and derived class is not yet initialized at this moment. Typical example:
+<code>
+abstract class Base {
+    val code = calculate()
+    abstract fun calculate(): Int
+}
+class Derived(private val x: Int) : Base() {
+    override fun calculate() = x
+}
+fun testIt() {
+    println(Derived(42).code) // Expected: 42, actual: 0
+}
+</code>
+</body>
+</html>
