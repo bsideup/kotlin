@@ -184,7 +184,7 @@ public class FunctionReferenceGenerationStrategy extends FunctionGenerationStrat
 
         if (receiverType != null) {
             return StackValue.field(
-                    receiverType, Type.getObjectType(codegen.getParentCodegen().v.getThisName()), AsmUtil.CAPTURED_RECEIVER_FIELD,
+                    receiverType, Type.getObjectType(codegen.getParentCodegen().getClassName()), AsmUtil.CAPTURED_RECEIVER_FIELD,
                     /* isStatic = */ false, StackValue.LOCAL_0
             );
         }
