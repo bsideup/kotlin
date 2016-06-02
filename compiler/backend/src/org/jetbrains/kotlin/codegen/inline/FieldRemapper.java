@@ -18,6 +18,7 @@ package org.jetbrains.kotlin.codegen.inline;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.kotlin.codegen.AsmUtil;
 import org.jetbrains.kotlin.codegen.StackValue;
 import org.jetbrains.org.objectweb.asm.Opcodes;
 import org.jetbrains.org.objectweb.asm.tree.AbstractInsnNode;
@@ -103,8 +104,12 @@ public class FieldRemapper {
 
     @Nullable
     protected CapturedParamInfo findField(@NotNull FieldInsnNode fieldInsnNode, @NotNull Collection<CapturedParamInfo> captured) {
+        String fieldName = fieldInsnNode.name;
+        if (fieldName.startsWith("methodRef$")) {
+            fieldName = AsmUtil.CAPTURED_RECEIVER_FIELD;
+        }
         for (CapturedParamInfo valueDescriptor : captured) {
-            if (valueDescriptor.getOriginalFieldName().equals(fieldInsnNode.name) && fieldInsnNode.owner.equals(valueDescriptor.getContainingLambdaName())) {
+            if (valueDescriptor.getOriginalFieldName().equals(fieldName) && fieldInsnNode.owner.equals(valueDescriptor.getContainingLambdaName())) {
                 return valueDescriptor;
             }
         }

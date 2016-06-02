@@ -17,6 +17,7 @@
 package org.jetbrains.kotlin.codegen.inline;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.codegen.AsmUtil;
 import org.jetbrains.kotlin.codegen.StackValue;
 import org.jetbrains.kotlin.codegen.binding.CalculatedClosure;
@@ -40,29 +41,24 @@ import java.util.Set;
 import static org.jetbrains.kotlin.codegen.binding.CodegenBinding.*;
 
 public class LambdaInfo implements CapturedParamOwner, LabelOwner {
-
     public final KtExpression expression;
-
     private final KotlinTypeMapper typeMapper;
-
-    @NotNull
     public final Set<String> labels;
-
     private final CalculatedClosure closure;
-
     public final boolean isCrossInline;
-
     private SMAPAndMethodNode node;
-
     private List<CapturedParamDesc> capturedVars;
-
     private final FunctionDescriptor functionDescriptor;
-
     private final ClassDescriptor classDescriptor;
-
     private final Type closureClassType;
+    public final StackValue functionReferenceReceiver;
 
-    LambdaInfo(@NotNull KtExpression expr, @NotNull KotlinTypeMapper typeMapper, boolean isCrossInline) {
+    LambdaInfo(
+            @NotNull KtExpression expr,
+            @NotNull KotlinTypeMapper typeMapper,
+            boolean isCrossInline,
+            @Nullable StackValue functionReferenceReceiver
+    ) {
         this.isCrossInline = isCrossInline;
         this.expression = expr instanceof KtLambdaExpression ?
                           ((KtLambdaExpression) expr).getFunctionLiteral() : expr;
@@ -78,8 +74,9 @@ public class LambdaInfo implements CapturedParamOwner, LabelOwner {
         closure = bindingContext.get(CLOSURE, classDescriptor);
         assert closure != null : "Closure for lambda should be not null " + expression.getText();
 
-
         labels = InlineCodegen.getDeclarationLabels(expr, functionDescriptor);
+
+        this.functionReferenceReceiver = functionReferenceReceiver;
     }
 
     public SMAPAndMethodNode getNode() {

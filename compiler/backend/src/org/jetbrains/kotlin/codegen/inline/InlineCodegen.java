@@ -20,7 +20,9 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
+import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
+import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.backend.common.CodegenUtil;
@@ -31,6 +33,8 @@ import org.jetbrains.kotlin.codegen.intrinsics.IntrinsicArrayConstructorsKt;
 import org.jetbrains.kotlin.codegen.state.GenerationState;
 import org.jetbrains.kotlin.codegen.state.KotlinTypeMapper;
 import org.jetbrains.kotlin.descriptors.*;
+import org.jetbrains.kotlin.descriptors.annotations.Annotations;
+import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor;
 import org.jetbrains.kotlin.load.kotlin.incremental.components.IncrementalCache;
 import org.jetbrains.kotlin.name.ClassId;
 import org.jetbrains.kotlin.name.Name;
@@ -48,6 +52,8 @@ import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodParameterKind;
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodParameterSignature;
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature;
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedSimpleFunctionDescriptor;
+import org.jetbrains.kotlin.types.KotlinType;
+import org.jetbrains.kotlin.types.expressions.DoubleColonLHS;
 import org.jetbrains.kotlin.types.expressions.LabelResolver;
 import org.jetbrains.org.objectweb.asm.Label;
 import org.jetbrains.org.objectweb.asm.MethodVisitor;
@@ -332,7 +338,7 @@ public class InlineCodegen extends CallGenerator {
             smap = createSMAPWithDefaultMapping(inliningFunction, parentCodegen.getOrCreateSourceMapper().getResultMappings());
         }
         else {
-            smap = generateMethodBody(maxCalcAdapter, functionDescriptor, methodContext, inliningFunction, jvmSignature, false, codegen, state);
+            smap = generateMethodBody(maxCalcAdapter, functionDescriptor, methodContext, inliningFunction, jvmSignature, false, codegen, state, null);
         }
         maxCalcAdapter.visitMaxs(-1, -1);
         maxCalcAdapter.visitEnd();
@@ -456,7 +462,9 @@ public class InlineCodegen extends CallGenerator {
 
         MethodVisitor adapter = InlineCodegenUtil.wrapWithMaxLocalCalc(methodNode);
 
-        SMAP smap = generateMethodBody(adapter, descriptor, context, declaration, jvmMethodSignature, true, codegen, state);
+        SMAP smap = generateMethodBody(
+                adapter, descriptor, context, declaration, jvmMethodSignature, true, codegen, state, info.functionReferenceReceiver
+        );
         adapter.visitMaxs(-1, -1);
         return new SMAPAndMethodNode(methodNode, smap);
     }
@@ -469,29 +477,31 @@ public class InlineCodegen extends CallGenerator {
             @NotNull JvmMethodSignature jvmMethodSignature,
             boolean isLambda,
             @NotNull ExpressionCodegen codegen,
-            @NotNull GenerationState state
+            @NotNull GenerationState state,
+            @Nullable StackValue functionReferenceReceiver
     ) {
-        FakeMemberCodegen parentCodegen =
-                new FakeMemberCodegen(codegen.getParentCodegen(), expression,
-                                      (FieldOwnerContext) context.getParentContext(),
-                                      isLambda ? codegen.getParentCodegen().getClassName()
-                                               : state.getTypeMapper().mapImplementationOwner(descriptor).getInternalName());
+        FieldOwnerContext parentContext = (FieldOwnerContext) context.getParentContext();
+        String className;
+        if (parentContext instanceof ClosureContext) {
+            className = state.getTypeMapper().mapClass(((ClosureContext) parentContext).getContextDescriptor()).getInternalName();
+        }
+        else {
+            // TODO: isn't isLambda false here?
+            className = isLambda ? codegen.getParentCodegen().getClassName()
+                                 : state.getTypeMapper().mapImplementationOwner(descriptor).getInternalName();
+        }
+        FakeMemberCodegen parentCodegen = new FakeMemberCodegen(codegen.getParentCodegen(), expression, parentContext, className);
 
         FunctionGenerationStrategy strategy;
         if (expression instanceof KtCallableReferenceExpression) {
-            KtCallableReferenceExpression callableReferenceExpression = (KtCallableReferenceExpression) expression;
-            KtExpression receiverExpression = callableReferenceExpression.getReceiverExpression();
-            StackValue receiverValue =
-                    receiverExpression != null && codegen.getBindingContext().getType(receiverExpression) != null
-                    ? codegen.gen(receiverExpression)
-                    : null;
-
             strategy = new FunctionReferenceGenerationStrategy(
                     state,
                     descriptor,
-                    CallUtilKt.getResolvedCallWithAssert(callableReferenceExpression.getCallableReference(), codegen.getBindingContext()),
-                    receiverValue != null ? receiverValue.type : null,
-                    receiverValue
+                    CallUtilKt.getResolvedCallWithAssert(
+                            ((KtCallableReferenceExpression) expression).getCallableReference(), codegen.getBindingContext()
+                    ),
+                    functionReferenceReceiver != null ? functionReferenceReceiver.type : null,
+                    functionReferenceReceiver
             );
         }
         else {
@@ -706,12 +716,16 @@ public class InlineCodegen extends CallGenerator {
                deparenthesized instanceof KtCallableReferenceExpression;
     }
 
-    public void rememberClosure(KtExpression expression, Type type, ValueParameterDescriptor parameter) {
+    private void rememberClosure(
+            @NotNull KtExpression expression,
+            @NotNull Type type,
+            @NotNull ValueParameterDescriptor parameter,
+            @Nullable StackValue functionReferenceReceiver
+    ) {
         KtExpression lambda = KtPsiUtil.deparenthesize(expression);
         assert isInlinableParameterExpression(lambda) : "Couldn't find inline expression in " + expression.getText();
 
-
-        LambdaInfo info = new LambdaInfo(lambda, typeMapper, parameter.isCrossinline());
+        LambdaInfo info = new LambdaInfo(lambda, typeMapper, parameter.isCrossinline(), functionReferenceReceiver);
 
         ParameterInfo closureInfo = invocationParamBuilder.addNextValueParameter(type, true, null, parameter.getIndex());
         closureInfo.setLambda(info);
@@ -741,7 +755,7 @@ public class InlineCodegen extends CallGenerator {
     private void putClosureParametersOnStack() {
         for (LambdaInfo next : expressionMap.values()) {
             activeLambda = next;
-            codegen.pushClosureOnStack(next.getClassDescriptor(), true, this, /* functionReferenceReceiver = */ null);
+            codegen.pushClosureOnStack(next.getClassDescriptor(), true, this, next.functionReferenceReceiver);
         }
         activeLambda = null;
     }
@@ -782,12 +796,42 @@ public class InlineCodegen extends CallGenerator {
             int parameterIndex
     ) {
         if (isInliningParameter(argumentExpression, valueParameterDescriptor)) {
-            rememberClosure(argumentExpression, parameterType, valueParameterDescriptor);
+            StackValue functionReferenceReceiver = generateBoundCallableReferenceLHSIfNeeded(argumentExpression);
+            rememberClosure(argumentExpression, parameterType, valueParameterDescriptor, functionReferenceReceiver);
         }
         else {
             StackValue value = codegen.gen(argumentExpression);
             putValueIfNeeded(parameterType, value, valueParameterDescriptor.getIndex());
         }
+    }
+
+    @Nullable
+    private StackValue generateBoundCallableReferenceLHSIfNeeded(@NotNull KtExpression expression) {
+        if (!(expression instanceof KtCallableReferenceExpression)) return null;
+
+        KtExpression receiverExpression = ((KtCallableReferenceExpression) expression).getReceiverExpression();
+        if (receiverExpression == null) return null;
+
+        DoubleColonLHS lhs = state.getBindingContext().get(BindingContext.DOUBLE_COLON_LHS, receiverExpression);
+        if (!(lhs instanceof DoubleColonLHS.Expression)) return null;
+
+        KotlinType type = lhs.getType();
+        final LocalVariableDescriptor fakeLocalVariableDescriptor = new LocalVariableDescriptor(
+                context.getFunctionDescriptor(), Annotations.Companion.getEMPTY(), Name.identifier("methodReferenceReceiver"), type,
+                false, false, SourceElement.NO_SOURCE
+        );
+        Type asmType = typeMapper.mapType(type);
+        int i = codegen.getFrameMap().enter(fakeLocalVariableDescriptor, asmType);
+        StackValue receiverValue = codegen.gen(receiverExpression);
+        StackValue.Local local = StackValue.local(i, asmType);
+        local.store(receiverValue, codegen.v); // TODO: if local, optimize and just take its index
+        return new StackValueWithLeaveTask(local, new Function1<StackValue, Unit>() {
+            @Override
+            public Unit invoke(StackValue value) {
+                // codegen.getFrameMap().leave(fakeLocalVariableDescriptor);
+                return Unit.INSTANCE;
+            }
+        });
     }
 
     @Override

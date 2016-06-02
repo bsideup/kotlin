@@ -1472,6 +1472,12 @@ public class BlackBoxCodegenTestGenerated extends AbstractBlackBoxCodegenTest {
                     doTest(fileName);
                 }
 
+                @TestMetadata("simpleStringConcat.kt")
+                public void testSimpleStringConcat() throws Exception {
+                    String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/callableReference/bound/inline/simpleStringConcat.kt");
+                    doTest(fileName);
+                }
+
                 @TestMetadata("simpleVal.kt")
                 public void testSimpleVal() throws Exception {
                     String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/callableReference/bound/inline/simpleVal.kt");

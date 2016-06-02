@@ -30,6 +30,9 @@ import org.jetbrains.kotlin.resolve.lazy.JvmResolveUtil;
 import org.jetbrains.kotlin.test.KotlinTestUtils;
 import org.jetbrains.kotlin.utils.ExceptionUtilsKt;
 import org.jetbrains.kotlin.utils.StringsKt;
+import org.jetbrains.org.objectweb.asm.tree.MethodNode;
+import org.jetbrains.org.objectweb.asm.util.Textifier;
+import org.jetbrains.org.objectweb.asm.util.TraceMethodVisitor;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,6 +70,15 @@ public class CodegenTestUtil {
         AnalyzingUtils.throwExceptionOnErrors(state.getCollectedExtraJvmDiagnostics());
 
         return state.getFactory();
+    }
+
+    // This method is useful in debugger
+    @SuppressWarnings("unused")
+    @NotNull
+    public static String printMethodNode(@NotNull MethodNode node) {
+        TraceMethodVisitor v = new TraceMethodVisitor(new Textifier());
+        node.accept(v);
+        return StringsKt.join(v.p.text, "");
     }
 
     public static void assertThrows(@NotNull Method foo, @NotNull Class<? extends Throwable> exceptionClass,

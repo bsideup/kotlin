@@ -180,7 +180,18 @@ public class FunctionReferenceGenerationStrategy extends FunctionGenerationStrat
 
     @NotNull
     private StackValue receiverParameterStackValue(@NotNull JvmMethodSignature signature, @NotNull ExpressionCodegen codegen) {
-        if (receiverValue != null) return receiverValue;
+        if (receiverValue != null) {
+            // TODO: if not local, store to local first?
+            if (receiverValue instanceof StackValue.Local) {
+                String name = "$$$methodRef$" + ((StackValue.Local) receiverValue).index;
+                return StackValue.field(
+                        receiverType, Type.getObjectType(codegen.getParentCodegen().getClassName()),
+                        name, /* isStatic = */ true, StackValue.none()
+                );
+            }
+
+            return receiverValue;
+        }
 
         if (receiverType != null) {
             return StackValue.field(
