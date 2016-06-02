@@ -17,6 +17,7 @@
 package org.jetbrains.kotlin.resolve
 
 import com.intellij.util.SmartList
+import org.jetbrains.kotlin.config.LanguageFeatureSettings
 import org.jetbrains.kotlin.context.TypeLazinessToken
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
@@ -55,7 +56,8 @@ class TypeResolver(
         private val lazinessToken: TypeLazinessToken,
         private val dynamicTypesSettings: DynamicTypesSettings,
         private val dynamicCallableDescriptors: DynamicCallableDescriptors,
-        private val identifierChecker: IdentifierChecker
+        private val identifierChecker: IdentifierChecker,
+        private val languageFeatureSettings: LanguageFeatureSettings
 ) {
 
     open class TypeTransformerForTests {
@@ -826,7 +828,7 @@ class TypeResolver(
     ): List<TypeProjection> {
         return argumentElements.mapIndexed { i, argumentElement ->
             val projectionKind = argumentElement.projectionKind
-            ModifierCheckerCore.check(argumentElement, c.trace, null)
+            ModifierCheckerCore.check(argumentElement, c.trace, null, languageFeatureSettings)
             if (projectionKind == KtProjectionKind.STAR) {
                 val parameters = constructor.parameters
                 if (parameters.size > i) {

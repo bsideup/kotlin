@@ -3705,6 +3705,12 @@ public class DiagnosticsTestGenerated extends AbstractDiagnosticsTest {
                 doTest(fileName);
             }
 
+            @TestMetadata("unsupported.kt")
+            public void testUnsupported() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/coroutines/unsupported.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("wrongHandleResult.kt")
             public void testWrongHandleResult() throws Exception {
                 String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/coroutines/wrongHandleResult.kt");

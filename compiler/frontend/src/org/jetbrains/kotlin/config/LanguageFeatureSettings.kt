@@ -23,7 +23,8 @@ enum class LanguageFeature(val sinceVersion: LanguageVersion) {
     // Note: names of these entries are also used in diagnostic tests
     TypeAliases(KOTLIN_1_1),
     LocalDelegatedProperties(KOTLIN_1_1),
-    TopLevelSealedInheritance(KOTLIN_1_1);
+    TopLevelSealedInheritance(KOTLIN_1_1),
+    Coroutines(KOTLIN_1_1);
 
     companion object {
         @JvmStatic
