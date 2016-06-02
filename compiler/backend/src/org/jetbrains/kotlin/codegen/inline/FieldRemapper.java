@@ -20,7 +20,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.codegen.StackValue;
 import org.jetbrains.org.objectweb.asm.Opcodes;
-import org.jetbrains.org.objectweb.asm.Type;
 import org.jetbrains.org.objectweb.asm.tree.AbstractInsnNode;
 import org.jetbrains.org.objectweb.asm.tree.FieldInsnNode;
 import org.jetbrains.org.objectweb.asm.tree.MethodNode;
@@ -72,31 +71,30 @@ public class FieldRemapper {
             int currentInstruction,
             @NotNull MethodNode node
     ) {
-        AbstractInsnNode transformed = null;
         boolean checkParent = !isRoot() && currentInstruction < capturedFieldAccess.size() - 1;
         if (checkParent) {
-            transformed = parent.foldFieldAccessChainIfNeeded(capturedFieldAccess, currentInstruction + 1, node);
-        }
-
-        if (transformed == null) {
-            //if parent couldn't transform
-            FieldInsnNode insnNode = (FieldInsnNode) capturedFieldAccess.get(currentInstruction);
-            if (canProcess(insnNode.owner, insnNode.name, true)) {
-                insnNode.name = "$$$" + insnNode.name;
-                insnNode.setOpcode(Opcodes.GETSTATIC);
-
-                AbstractInsnNode next = capturedFieldAccess.get(0);
-                while (next != insnNode) {
-                    AbstractInsnNode toDelete = next;
-                    next = next.getNext();
-                    node.instructions.remove(toDelete);
-                }
-
-                transformed = capturedFieldAccess.get(capturedFieldAccess.size() - 1);
+            AbstractInsnNode parentResult = parent.foldFieldAccessChainIfNeeded(capturedFieldAccess, currentInstruction + 1, node);
+            if (parentResult != null) {
+                return parentResult;
             }
         }
 
-        return transformed;
+        FieldInsnNode insnNode = (FieldInsnNode) capturedFieldAccess.get(currentInstruction);
+        if (canProcess(insnNode.owner, insnNode.name, true)) {
+            insnNode.name = "$$$" + insnNode.name;
+            insnNode.setOpcode(Opcodes.GETSTATIC);
+
+            AbstractInsnNode next = capturedFieldAccess.get(0);
+            while (next != insnNode) {
+                AbstractInsnNode toDelete = next;
+                next = next.getNext();
+                node.instructions.remove(toDelete);
+            }
+
+            return capturedFieldAccess.get(capturedFieldAccess.size() - 1);
+        }
+
+        return null;
     }
 
     public CapturedParamInfo findField(@NotNull FieldInsnNode fieldInsnNode) {
