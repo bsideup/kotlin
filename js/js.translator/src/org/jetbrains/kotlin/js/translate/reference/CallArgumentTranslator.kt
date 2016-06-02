@@ -17,6 +17,8 @@
 package org.jetbrains.kotlin.js.translate.reference
 
 import com.google.dart.compiler.backend.js.ast.*
+import com.google.dart.compiler.backend.js.ast.metadata.SideEffectKind
+import com.google.dart.compiler.backend.js.ast.metadata.sideEffects
 import com.intellij.util.SmartList
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.js.translate.context.Namer
@@ -140,7 +142,7 @@ class CallArgumentTranslator private constructor(
             concatArguments!!.addAll(result)
 
             if (!argsBeforeVararg!!.isEmpty()) {
-                concatArguments.add(0, JsArrayLiteral(argsBeforeVararg))
+                concatArguments.add(0, JsArrayLiteral(argsBeforeVararg).apply { sideEffects = SideEffectKind.DEPENDS_ON_STATE })
             }
 
             result = SmartList(concatArgumentsIfNeeded(concatArguments))
@@ -208,7 +210,7 @@ class CallArgumentTranslator private constructor(
         private fun translateVarargArgument(arguments: List<ValueArgument>, result: MutableList<JsExpression>, context: TranslationContext, shouldWrapVarargInArray: Boolean): ArgumentsKind {
             if (arguments.isEmpty()) {
                 if (shouldWrapVarargInArray) {
-                    result.add(JsArrayLiteral(listOf<JsExpression>()))
+                    result.add(JsArrayLiteral(listOf<JsExpression>()).apply { sideEffects = SideEffectKind.DEPENDS_ON_STATE })
                 }
                 return ArgumentsKind.HAS_NOT_EMPTY_EXPRESSION_ARGUMENT
             }
@@ -286,7 +288,7 @@ class CallArgumentTranslator private constructor(
 
                 if (valueArgument.getSpreadElement() != null) {
                     if (lastArrayContent.size > 0) {
-                        concatArguments.add(JsArrayLiteral(lastArrayContent))
+                        concatArguments.add(JsArrayLiteral(lastArrayContent).apply { sideEffects = SideEffectKind.DEPENDS_ON_STATE })
                         concatArguments.add(expressionArgument)
                         lastArrayContent = SmartList<JsExpression>()
                     }
@@ -299,7 +301,7 @@ class CallArgumentTranslator private constructor(
                 }
             }
             if (lastArrayContent.size > 0) {
-                concatArguments.add(JsArrayLiteral(lastArrayContent))
+                concatArguments.add(JsArrayLiteral(lastArrayContent).apply { sideEffects = SideEffectKind.DEPENDS_ON_STATE })
             }
 
             return concatArguments
