@@ -248,6 +248,16 @@ class KotlinReferencesSearcher : QueryExecutorBase<PsiReference, ReferencesSearc
             }
         }
 
+        private fun searchAnnotationParameterUsages(queryParameters: ReferencesSearch.SearchParameters,
+                                                    element: KtParameter) {
+            val parent = element.ownerFunction as? KtPrimaryConstructor ?: return
+            val containingClass = parent.getContainingClassOrObject()
+            if (!containingClass.isAnnotation()) return
+
+            val annotationMethod = LightClassUtil.getLightClassMethod(element) ?: return
+            searchNamedElement(queryParameters, annotationMethod)
+        }
+
         private fun searchLightElements(queryParameters: ReferencesSearch.SearchParameters, element: PsiElement) {
             when (element) {
                 is KtClassOrObject -> processKtClassOrObject(element, queryParameters)
@@ -273,6 +283,8 @@ class KotlinReferencesSearcher : QueryExecutorBase<PsiReference, ReferencesSearc
                 is KtParameter -> {
                     searchPropertyMethods(queryParameters, element)
                     runReadAction {
+                        searchAnnotationParameterUsages(queryParameters, element)
+
                         val componentFunctionDescriptor = element.dataClassComponentFunction()
                         if (componentFunctionDescriptor != null) {
                             val containingClass = element.getStrictParentOfType<KtClassOrObject>()?.toLightClass()
